@@ -50,9 +50,26 @@ The key things here are:
 
  *	The syntax is terse, much more so than SQL but still very SQL like
 
+ * 	Everything is a table
+
+ * 	WHERE conditions are placed in [] (square brackets)
+
+ * 	JOINS are done using the * operator, with tables being aliased with 1,2... depending on the order they are joined on.
+
+ *	GROUP BY is redundant, if a query contains an aggregation, then any non-aggregated columns will automatically be handled like a GROUP BY.
+
+ * 	Columns / Expressions are aliased by placing the alias in double quotes.
+
+ * 	"->" replaces the SELECT command and it occurs at the end of the query definition.
+
  *	Queries can be aliased easily without being realized by using the "=" operator.  That is, we can use "passed_qc" wherever we would normally use a table without actually executing and storing it anywhere.  This is basically like a VIEW in SQL databases, but without the hassle of persistence
 
  *	We can actually create a new table from a query by using the ":=" operator, which will actually execute the query and allow it to be referenced by the variable name.  This is like inserting into a table in SQL, and means that a separate copy of the table will be created.  This is particularly useful for when you create expensive aggregations where the overhead of storing the output in memory is less than the overhead of constantly re-running the query.  
+
+
+## What is the status of this project ##
+
+Its in active development.  We have built up the low level data access aspects of the system, and are working on the network layer currently.  It is hoped that we will have an alpha release ready in September 2012 - but this depends on many things and may blow out. 
 
  
 ## Why not use one of these tools? ##
@@ -66,7 +83,7 @@ Hadoop is an awesome tool, but its elephant logo is fitting – its big and cumb
 These tools are awesome at scaling to support a lot of users concurrently.  However they are pretty awful at supporting complex queries from a single user.  The workloads are completely different.  These NoSQL solutions are wonderful for scaling a web app, but trying to do complex queries involving aggregations, joins and sub queries and generating generalized linear models from the output would kind of be tricky even in Redis.
 
 
-## So how are you going to do all of this? ##
+## So how is all of this implemented? ##
 
 tnydb is written in a combination of C and golang.  The division of duties between languages is simple, anything that does data access on a _Page_ of data is written in C, anything higher up is written in golang.  Thus we get the full control of memory allocation and access from C, with the speed of development that golang provides.
 
