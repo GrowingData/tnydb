@@ -12,6 +12,8 @@ Computing power is cheap, and most analysts have access to clusters (or can use 
 ## What is the use-case this is for? ##
 
 Let’s say we have a single table of data with the following schema (in SQL)
+
+```sql
 CREATE TABLE read (
 	id INT,
 	pair_id INT,
@@ -20,6 +22,7 @@ CREATE TABLE read (
 	is_reverse BIT
 	is_first BIT
 )
+```
 
 I want to draw a histogram of the distance between the first read in the pair and the second, broken into buckets of 50.   That is want to get the number of read-pairs with difference in position of 0, 50, 100, 150, 200, etc.  I also want to do this only where the quality is more than 10, and they are both in the same orientation.
 I can express this as the following set of commands:
