@@ -47,9 +47,12 @@ pairs->50*(isize/50), count()
 
 
 The key things here are:
-	* The syntax is terse, much more so than SQL but still very SQL like
-	* Queries can be aliased easily without being realized by using the “=” operator.  That is, we can use “passed_qc” wherever we would normally use a table without actually executing and storing it anywhere.  This is basically like a VIEW in SQL databases, but without the hassle of persistence
-	* We can actually create a new table from a query by using the “:=” operator, which will actually execute the query and allow it to be referenced by the variable name.  This is like inserting into a table in SQL, and means that a separate copy of the table will be created.  This is particularly useful for when you create expensive aggregations where the overhead of storing the output in memory is less than the overhead of constantly re-running the query.  
+
+ *	The syntax is terse, much more so than SQL but still very SQL like
+
+ *	Queries can be aliased easily without being realized by using the "=" operator.  That is, we can use "passed_qc" wherever we would normally use a table without actually executing and storing it anywhere.  This is basically like a VIEW in SQL databases, but without the hassle of persistence
+
+ *	We can actually create a new table from a query by using the ":=" operator, which will actually execute the query and allow it to be referenced by the variable name.  This is like inserting into a table in SQL, and means that a separate copy of the table will be created.  This is particularly useful for when you create expensive aggregations where the overhead of storing the output in memory is less than the overhead of constantly re-running the query.  
 
  
 ## Why not use one of these tools? ##
