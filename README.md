@@ -36,7 +36,6 @@ passed_qc = read[quality > 10]
 pairs := (passed_qc[is_first=1]*passed_qc[is_first=0])
 	[
 		1.id=2.pair_id 					// Same pair of data
-	&&	2.pos - 1.pos < 0 				// Negative insert size
 	&& 	(1.is_reverse = 2.is_reverse)	// Same orientation
 	]
 	-> 2.pos - 1.pos "isize", 1.pos "a_pos", 2.pos "b_pos"
