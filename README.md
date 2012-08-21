@@ -51,7 +51,7 @@ The key things here are:
 
  * 	Everything is a table
 
- * 	WHERE conditions are placed in [] (square brackets)
+ * 	WHERE conditions are placed in square brackets (e.g. "[" <conditions> "]" )
 
  * 	JOINS are done using the * operator, with tables being aliased with 1,2... depending on the order they are joined on.
 
