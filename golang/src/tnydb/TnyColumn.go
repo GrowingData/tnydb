@@ -1,7 +1,7 @@
 package tnydb
 
-// #cgo CFLAGS: -std=gnu99 -msse4.1 -I../../c/core/
-// #cgo LDFLAGS: -L../../Debug/ -ltnydb
+// #cgo CFLAGS: -std=gnu99 -msse4.1 -I../../../c/
+// #cgo LDFLAGS: -L../../lib/ -ltnydb
 // #include "tny_page.h"
 // #include "tny.h"
 import "C"
@@ -151,10 +151,10 @@ func (self *TnyColumn) LoadPage(def TnyPageDefinition) *TnyPage {
 
 	server := self.Table.Database.Server
 
-	reader := server.IO.GetReader(def.DataPath)
+	reader, _ := server.IO.GetReader(def.DataPath)
 	defer server.IO.Close(def.DataPath)
 
-	page := ReadPage(reader, self)
+	page := ReadPage(reader, self, &def)
 
 	self.Pages = append(self.Pages, page)
 

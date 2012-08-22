@@ -14,8 +14,8 @@ libtnydb: release-libtnydb
 
 # Set up the paths required
 path: 
-	GOPATH=$GOPATH:$(CURDIR)/golang
-	LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(CURDIR)/golang/lib
+	export GOPATH=$(GOPATH):$(CURDIR)/golang/
+	export LD_LIBRARY_PATH=$(LD_LIBRARY_PATH):$(CURDIR)/golang/lib/
 
 
 # Format all my code please

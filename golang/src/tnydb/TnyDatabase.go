@@ -19,7 +19,7 @@ func (self *TnyDatabase) DataPath() string {
 func (self *TnyDatabase) NewTable(name string) *TnyTable {
 	tbl := new(TnyTable)
 	if len(name) == 0 {
-		name, _ = Uuid()
+		name = Uuid()
 	}
 
 	tbl.Name = name

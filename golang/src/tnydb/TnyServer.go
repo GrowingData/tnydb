@@ -1,7 +1,8 @@
 package tnydb
 
-import "encoding/json"
 import "fmt"
+import "runtime"
+import "encoding/json"
 
 var stop_fmt_error_TnyServer = fmt.Sprintf("keep 'fmt' import during debugging")
 
@@ -10,7 +11,7 @@ type TnyServer struct {
 	Databases     map[string]*TnyDatabase
 	ListenAddress string
 	ServerAddress string
-	Network       *TnyNetwork
+	Cluster       *TnyCluster
 }
 
 func NewServer(ioProvider string, listen_addr string, server_addr string) *TnyServer {
@@ -18,7 +19,9 @@ func NewServer(ioProvider string, listen_addr string, server_addr string) *TnySe
 	server.Databases = make(map[string]*TnyDatabase)
 	server.ListenAddress = listen_addr
 	server.ServerAddress = server_addr
-	server.Network = NewTnyNetwork(server, listen_addr, server_addr)
+
+	// Create a server!
+	server.Cluster = NewTnyClusterServer(server, listen_addr, server_addr)
 
 	if ioProvider == "Filesystem" {
 		server.IO = NewTnyIOFileSystem()
@@ -29,8 +32,8 @@ func NewServer(ioProvider string, listen_addr string, server_addr string) *TnySe
 }
 
 func (self *TnyServer) Serve() {
-	self.Network.Start()
-	self.Network.Wait()
+	self.Cluster.Start()
+	self.Cluster.Wait()
 
 }
 
@@ -43,36 +46,42 @@ func (server *TnyServer) NewDatabase(name string) *TnyDatabase {
 	return db
 }
 
-func (self *TnyServer) LoadDatabase(name string) *TnyDatabase {
+func (self *TnyServer) LoadDatabase(name string) (*TnyDatabase, error) {
 
 	var def TnyDatabaseDefinition
 
 	// Load the definitiion
 	filename := "db-" + name + ".json"
-	reader := self.IO.GetReader(filename)
-	defer self.IO.Close(filename)
+	if reader, err := self.IO.GetReader(filename); err != nil {
+		return nil, err
 
-	dec := json.NewDecoder(reader)
-	dec.Decode(&def)
+	} else {
+		defer self.IO.Close(filename)
 
-	db := new(TnyDatabase)
-	db.Name = name
-	db.Server = self
-	db.Tables = make(map[string]*TnyTable)
+		dec := json.NewDecoder(reader)
+		dec.Decode(&def)
 
-	for _, t := range def.Tables {
-		db.LoadTable(t)
+		db := new(TnyDatabase)
+		db.Name = name
+		db.Server = self
+		db.Tables = make(map[string]*TnyTable)
+
+		for _, t := range def.Tables {
+			db.LoadTable(t)
+		}
+
+		self.Databases[name] = db
+
+		return db, nil
 	}
 
-	self.Databases[name] = db
-
-	return db
+	return nil, nil
 }
 
-func (self *TnyServer) NodeInformation() N_NodeDetails {
+func (self *TnyServer) NodeInformation() *N_NodeDetails {
 	fmt.Printf("TnyServer.NodeInformation: %s\n", self.ListenAddress)
 
-	node := N_NodeDetails{Address: self.ListenAddress, Type: N_SERVER}
+	node := N_NodeDetails{Address: self.ListenAddress, Role: N_SERVER, CPUs: runtime.NumCPU()}
 	node.Pages = make([]N_Page, 0)
 
 	// Find my pages
@@ -90,7 +99,7 @@ func (self *TnyServer) NodeInformation() N_NodeDetails {
 			}
 		}
 	}
-	return node
+	return &node
 
 }
 

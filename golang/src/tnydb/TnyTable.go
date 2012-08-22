@@ -57,11 +57,14 @@ func (self *TnyTable) LoadColumn(def TnyColumnDefinition) *TnyColumn {
 	col.Length = def.Length
 
 	for _, p := range def.Pages {
+		// Make sure that we track that the page has not 
+		// actually been loaded yet.
+		p.Loaded = false
 		col.PageDefinitions = append(col.PageDefinitions, p)
 	}
 	// Load the keys for my column yo!
 	// fmt.Printf("LoadColumn: def.DataPath:%s\n", def.DataPath+".keys")
-	reader := self.Database.Server.IO.GetReader(def.DataPath + ".keys")
+	reader, _ := self.Database.Server.IO.GetReader(def.DataPath + ".keys")
 	col.ReadData(reader)
 
 	// Now add all our references to the Table

@@ -49,11 +49,11 @@ func (self TnyIO_FileSystem) GetWriter(path string) *bufio.Writer {
 	return handle.writer
 }
 
-func (self TnyIO_FileSystem) GetReader(path string) *bufio.Reader {
+func (self TnyIO_FileSystem) GetReader(path string) (*bufio.Reader, error) {
 	newPath := GetPath(path)
 	fo, err := os.Open(newPath)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	var handle io_fs_handle
@@ -62,7 +62,7 @@ func (self TnyIO_FileSystem) GetReader(path string) *bufio.Reader {
 
 	self.handles[path] = handle
 
-	return handle.reader
+	return handle.reader, nil
 }
 
 func (self TnyIO_FileSystem) Close(path string) {

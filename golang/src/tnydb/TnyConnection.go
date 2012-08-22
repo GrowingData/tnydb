@@ -4,110 +4,141 @@ import "fmt"
 import "net"
 
 type TnyConnection struct {
-	Network   *TnyNetwork
-	Transport *TnyNetworkChannel
-	Node      N_NodeDetails
-	Callbacks map[string]NetworkCallback
+	Cluster   *TnyCluster
+	Transport *TnyClusterChannel
+	Node      *N_NodeDetails
+	Callbacks map[string]ClusterCallback
+	Quit      chan (int)
 }
 
-// Create a new TnyConnection for a new node entering the ystem
-func BindConnection(connection net.Conn, network *TnyNetwork) *TnyConnection {
-	node := new(TnyConnection)
-	node.Transport = NewTnyNetworkChannel(connection)
-	node.Network = network
+func ConnectionFromListen(connection net.Conn, cluster *TnyCluster) *TnyConnection {
+	cn := init_connection(connection, cluster)
 
-	go node.recv_loop()
+	// Wait for the first bit of data to be sent...
+	select {
+	case packet := <-cn.Transport.In:
+		if node, ok := packet.(*N_NodeDetails); !ok {
+			fmt.Printf("Unable to convert packet to N_NodeDetails. Hanshake Failed (Listen)!\n")
 
-	// Tell them who we are
-	node.Transport.Out <- network.Server.NodeInformation()
-	return node
+			return nil
+		} else {
+			// Send them a bit of information about who I am...
+			nodeInfo := &(N_NodeDetails{Role: N_CLIENT})
+			if cluster.Server != nil {
+				nodeInfo = cluster.Server.NodeInformation()
+			}
+			nodeInfo.SetSequence(packet.GetSequence())
+			cn.Transport.Out <- nodeInfo
+
+			cn.Node = node
+
+			go cn.recv_loop()
+
+			// fmt.Printf("Connected (Listen)\n")
+			return cn
+
+		}
+
+	}
+
+	return nil
 }
 
-func (self *TnyConnection) RequestTopology() {
-	// Ask them who they know about
-	self.Transport.Out <- N_Topology_Request{}
+func ConnectionFromDial(connection net.Conn, cluster *TnyCluster) *TnyConnection {
+	cn := init_connection(connection, cluster)
+	go cn.recv_loop()
+
+	// Dialer needs to indentify themselves...
+	nodeInfo := &(N_NodeDetails{Role: N_CLIENT})
+	if cluster.Server != nil {
+		nodeInfo = cluster.Server.NodeInformation()
+	}
+	nodeInfo.SetSequence(Uuid())
+
+	server_node := make(chan *N_NodeDetails, 1)
+
+	cn.Send(nodeInfo, func(cn *TnyConnection, packet TnyClusterPacket) { // Callback when the response to the request has been sent to us
+		if response, ok := packet.(*N_NodeDetails); !ok {
+			// Error!
+			server_node <- nil
+		} else {
+			// Got the details
+			server_node <- response
+		}
+
+	})
+	cn.Node = <-server_node
+
+	if cn.Node == nil {
+		fmt.Printf("Unable to convert packet to N_NodeDetails. Hanshake Failed (Dial)!\n")
+		return nil
+	}
+
+	// fmt.Printf("Connected (Dialed)\n")
+	return cn
 }
 
-func (self *TnyConnection) Send(packet TnyNetworkable, callback NetworkCallback) {
+func init_connection(connection net.Conn, cluster *TnyCluster) *TnyConnection {
+	NET_INITIALIZE()
+
+	cn := new(TnyConnection)
+	cn.Transport = NewTnyClusterChannel(connection, func() { cn.Closed() })
+	cn.Cluster = cluster
+	cn.Callbacks = make(map[string]ClusterCallback)
+
+	return cn
+}
+
+func (self *TnyConnection) Closed() {
+	self.Cluster.ConnectionClosed(self)
+	self.Quit <- 1
+}
+
+func (self *TnyConnection) Send(packet TnyClusterPacket, callback ClusterCallback) {
+
 	if callback != nil {
-		packet.SetSequence(Uuid())
+		u := Uuid()
+		packet.SetSequence(u)
+		// fmt.Printf("TnyConnection.Sending (type: %d, seq:%s)\n", packet.Type(), packet.GetSequence())
 		self.Callbacks[packet.GetSequence()] = callback
 	}
-	node.Transport.Out <- packet
+	self.Transport.Out <- packet
+
 }
 
 func (self *TnyConnection) recv_loop() {
 	for {
 		select {
 		case packet := <-self.Transport.In:
-			// When a new packet arrives, decide what to do with it
-			switch packet.Type() {
+			pt := packet.Type()
 
-			// Requests made by 
-			case N_IAM:
-				fmt.Printf("TnyConnection.recv_loop.N_IAM\n")
-				if node, ok := packet.(N_NodeDetails); !ok {
-					fmt.Printf("Unable to convert packet to N_NodeDetails, ignoring request.\n")
+			if reader, ok := NET_REGISTERED_TYPES[pt]; !ok {
+				fmt.Printf("Unable to find decoder for PacketType: %d, ignoring.\n", pt)
+
+			} else {
+				if handler := reader.GetHandler(); handler != nil {
+					handler(self, packet)
 				} else {
-					self.Node = node
-					self.Network.OnNodeIdentified(self)
-				}
+					// No handler, so you must be a response
+					if len(packet.GetSequence()) > 0 {
 
-			case N_TOPOLOGY_REQUEST:
-				fmt.Printf("TnyConnection.recv_loop.N_TOPOLOGY_REQUEST: Sending %d nodes.\n", len(self.Network.Connections))
-				topology := N_Topology_Response{}
-				for _, cn := range self.Network.Connections {
-					topology.Nodes = append(topology.Nodes, cn.Node)
-					fmt.Printf("\tNode: %s\n", cn.Node.Address)
-				}
-				topology.SetSequence(packet.GetSequence())
-				self.Transport.Out <- topology
+						if val, ok := self.Callbacks[packet.GetSequence()]; ok {
+							// Awesome, we have something so lets send it to its
+							// callback yeah?
+							go val(self, packet)
 
-			case N_LoadDatabase_Request:
-				fmt.Printf("TnyConnection.recv_loop.N_LoadDatabase_Request:\n")
-				if req, ok := packet.(N_LoadDatabase_Request); !ok {
-					fmt.Printf("Unable to convert packet to N_LoadDatabase_Request, ignoring request.\n")
-				} else {
-					self.Network.Server.LoadDatabase(req.DatabaseName)
-
-				}
-
-			// Responses to requests
-			default:
-
-				// The packet is a response to something that we already sent
-				if packet.GetSequence() != nil {
-
-					if val, ok := self.Callbacks[packet.GetSequence()]; ok {
-						// Awesome, we have something so lets send it to its
-						// callback yeah?
-						go val(packet)
-
-						// Remove the reference to the callback so we don't 
-						// run out of memories
-						delete(self.Callbacks, packet.GetSequence())
+							// Remove the reference to the callback so we don't 
+							// run out of memories
+							delete(self.Callbacks, packet.GetSequence())
+						}
 					}
+
 				}
 
-				// // What other nodes are in the network?
-
-				// // Here are all the nodes I know about
-				// case N_TOPOLOGY_RESPONSE:
-				// 	if response, ok := packet.(N_Topology_Response); !ok {
-				// 		fmt.Printf("Unable to convert packet to N_Topology_Response, ignoring request.\n")
-				// 	} else {
-				// 		fmt.Printf("TnyConnection.recv_loop.N_TOPOLOGY_RESPONSE: Got %d nodes.\n", len(response.Nodes))
-				// 		self.Network.OnTopologyReceived(self, response.Nodes)
-				// 	}
-				// case N_DATABASE_LOAD_REQUEST:
-				// 	if response, ok := packet.(N_LoadDatabase_Request); !ok {
-				// 		fmt.Printf("Unable to convert packet to N_LoadDatabase_Request, ignoring request.\n")
-				// 	} else {
-				// 		self.Network.Server.LoadDatabase(response.DatabaseName, response.DistributePages)
-				// 	}
-
-				// Now somehow we need to 
 			}
+		// The connection has broken, so get out
+		case <-self.Quit:
+			break
 
 		}
 	}

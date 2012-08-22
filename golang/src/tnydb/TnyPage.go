@@ -1,6 +1,6 @@
 package tnydb
 
-// #cgo CFLAGS: -std=gnu99 -msse4.1 -I../../../c/core/
+// #cgo CFLAGS: -std=gnu99 -msse4.1 -I../../../c/
 // #cgo LDFLAGS: -L../../lib/ -ltnydb
 // #include "tny_page.h"
 // #include "tny.h"
@@ -16,8 +16,13 @@ const PAGE_MAX_VALUES = 8192
 
 var place_holder_to_stop_fmt_error = fmt.Sprintf("keep 'fmt' import during debugging")
 
+// This is the structure that we use to store information about the
+// Page when we save the database.  We also use it to send to the client
+// on "load-batabase" so it can instruct the cluster on what pages to load
+
 type TnyPageDefinition struct {
 	DataPath string
+	Loaded   bool
 }
 
 type TnyPage struct {
@@ -69,6 +74,7 @@ func (self *TnyPage) DataPath() string {
 func (self *TnyPage) GetDefinition() TnyPageDefinition {
 	var def TnyPageDefinition
 	def.DataPath = self.DataPath()
+	def.Loaded = true
 
 	return def
 }
@@ -114,7 +120,7 @@ func (self *TnyPage) WritePage(writer *bufio.Writer) {
 	// fmt.Printf("\n")
 }
 
-func ReadPage(reader *bufio.Reader, column *TnyColumn) *TnyPage {
+func ReadPage(reader *bufio.Reader, column *TnyColumn, def *TnyPageDefinition) *TnyPage {
 
 	C_key_count := C.int(column.KeyCount())
 
@@ -185,7 +191,7 @@ func ReadPage(reader *bufio.Reader, column *TnyColumn) *TnyPage {
 		}
 
 	}
-
+	def.Loaded = true
 	// Test the first few values
 	// fmt.Printf("Read Page (%d): ", depth)
 	// for i := 0; i < 10; i++ {

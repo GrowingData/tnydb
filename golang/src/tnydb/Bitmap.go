@@ -1,6 +1,6 @@
 package tnydb
 
-// #cgo CFLAGS: -std=gnu99 -msse4.1 -I../../../c/core/
+// #cgo CFLAGS: -std=gnu99 -msse4.1 -I../../../c/
 // #cgo LDFLAGS: -L../../lib/ -ltnydb
 // #include "tny_page.h"
 // #include "tny.h"

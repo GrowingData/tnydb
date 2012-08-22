@@ -1,3 +1,6 @@
 tnyc
 tnyd
 golang/lib/*.so
+*.so
+*.o
+*.d
